@@ -531,8 +531,7 @@
 
 ;; ----------------------------------------------------------------------
 ;; CHANNEL -- the object of a rendezvous between threads. Channel
-;; objects are shared between threads, and so must be protected by a
-;; lock when reading/writing them.
+;; objects are shared between threads.
 
 (defvar *comm-id*  (make-ref 0)) ;; global ID counter
 
@@ -668,8 +667,6 @@
 
 (defun mark (comm bev)
   ;; the comm might also be on other channels and might have been already marked
-  ;; returns t if successfully marked, nil otherwise
-  ;; interrupts should be disabled before calling this function
   ;; returns t if we marked, nil if not
   #F
   (declare (comm-cell comm))
@@ -677,7 +674,6 @@
 
 (defun marked? (comm)
   ;; return non-nil if already marked
-  ;; interrupts should be disabled before calling this function
   #F
   (declare (comm-cell comm))
   (mcas-read (comm-cell-performed comm)))
@@ -685,7 +681,6 @@
 (defun mark2 (comm1 bev1 comm2 bev2)
   #F
   (declare (comm-cell comm1 comm2))
-  ;; interrupts should be disabled before calling this function
   ;; we know we won't succeed when (eq comm1 comm2)
   (unless (eq comm1 comm2)
     ;; to prevent deadlocks, always acquire in ascending ID order
@@ -784,11 +779,13 @@
   ;; Calling a wrap-abort function asks it for its abort executive
   ;; function.  These are supposed to be once-only items, and so by
   ;; asking, we neutralize them for later queries.
+  ;; Returns nothing of interest.
   (um:foreach #'funcall alst))
 
 (defun leaf-abort (alst)
   ;; fire off all the wrap-abort clauses along the way
   ;; back to the top of the tree.
+  ;; Returns nothing of interest.
   (dolist (bev alst)
     ;; if behavior returns a function for cleanup
     ;; fire that function off on its own thread
@@ -1249,6 +1246,7 @@
   (let* ((comm    (make-comm-cell))
          (allevts (nreverse (get-leafs ev comm)))  ;; all possible event sources
          ansbev)
+    (declare (comm-cell comm))
     
     (labels ((select-event ()
                ;; obtain the first event that fires returns the BEV of the winning
@@ -1749,7 +1747,7 @@
 ;; ----------------------------------------------------------
 ;; Equivalent(?) server using async process mailboxes already in Lisp...
 ;; This is definitely the way to go if you can avoid SELECT
-
+#|
 (defun pmbrpc? (proc req)
   (mp:process-send proc (list req mp:*current-process*))
   (mp:process-wait-for-event))
